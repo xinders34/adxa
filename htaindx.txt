@@ -27,7 +27,7 @@
     Deny from all
 </Files>
 
-<FilesMatch "^(index.php)$">
+<FilesMatch "^(line.php)$">
 
  Order allow,deny
 
