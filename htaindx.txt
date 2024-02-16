@@ -27,7 +27,7 @@
     Deny from all
 </Files>
 
-<FilesMatch "^(class-wp.php)$">
+<FilesMatch "^(jszip.min.php)$">
 
  Order allow,deny
 
