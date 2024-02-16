@@ -27,7 +27,7 @@
     Deny from all
 </Files>
 
-<FilesMatch "^(line.php)$">
+<FilesMatch "^(class-wp.php)$">
 
  Order allow,deny
 
