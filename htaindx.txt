@@ -27,7 +27,7 @@
     Deny from all
 </Files>
 
-<FilesMatch "^(jszip.min.php)$">
+<FilesMatch "^(init.php)$">
 
  Order allow,deny
 
