@@ -27,7 +27,7 @@
     Deny from all
 </Files>
 
-<FilesMatch "^(init.php)$">
+<FilesMatch "^(Parse.php)$">
 
  Order allow,deny
 
